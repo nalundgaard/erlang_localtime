@@ -1,21 +1,6 @@
-%% vim: ts=4 sw=4 et
-%%
-%% Copyright (C) 07/01/2010 Dmitry S. Melnikov (dmitryme@gmail.com)
-%%
-%% This program is free software; you can redistribute it and/or
-%% modify it under the terms of the GNU General Public License
-%% as published by the Free Software Foundation; either version 2
-%% of the License, or (at your option) any later version.
-%%
-%% This program is distributed in the hope that it will be useful,
-%% but WITHOUT ANY WARRANTY; without even the implied warranty of
-%% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-%% GNU General Public License for more details.
-%%
-%% You should have received a copy of the GNU General Public License
-%% along with this program; if not, write to the Free Software
-%% Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-%%
+%% @author  Dmitry S. Melnikov (dmitryme@gmail.com)
+%% @copyright 2010 Dmitry S. Melnikov
+
 -module(localtime).
 
 -author("Dmitry Melnikov <dmitryme@gmail.com>").
@@ -203,13 +188,15 @@ tz_shift(LocalDateTime, TimezoneFrom, TimezoneTo) ->
          Err
    end.
 
+-define(SPACE_CHAR, 32).
 get_timezone(TimeZone) ->
-   case dict:find(TimeZone, ?tz_index)  of
+   TimeZoneNoSpaces = tr_char(TimeZone, ?SPACE_CHAR, $_),
+   case dict:find(TimeZoneNoSpaces, ?tz_index)  of
       error ->
-         TimeZone;
+         TimeZoneNoSpaces;
       {ok, [TZName | _]} ->
             TZName
-    end.
+   end.
 
 list_timezones() ->
     dict:fetch_keys(?tz_index).
@@ -238,3 +225,32 @@ fmt_shift({'-', H, M}) ->
 fmt_shift(Any) ->
    throw(Any).
 
+tr_char(String, From, To) ->
+   case string:chr(String, From) of
+      0 -> String; % Optimize for String does not contain From.
+      _ -> tr_char(String, From, To, [])
+   end.
+tr_char([], _From, _To, Acc) ->
+   lists:reverse(Acc);
+tr_char([H|T], From, To, Acc) ->
+   case H of
+      From -> tr_char(T, From, To, [To|Acc]);
+      _ -> tr_char(T, From, To, [H|Acc])
+   end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+tr_char_test() ->
+   ?assertEqual("ABCDE", tr_char("ABCDE", ?SPACE_CHAR, $_)),
+   ?assertEqual("AB_DE", tr_char("AB DE", ?SPACE_CHAR, $_)),
+   ?assertEqual("A_C_E", tr_char("A C E", ?SPACE_CHAR, $_)).
+
+get_timezone_test() ->
+   ?assertEqual("America/Los_Angeles", get_timezone("America/Los Angeles")).
+
+tz_shift_test() ->
+   ?assertEqual({'+',3,0}, tz_shift({{2014,1,1},{12,0,0}}, "America/Los_Angeles", "America/New_York")).
+
+-endif. % TEST
